@@ -5,6 +5,8 @@ Authentication and authorization service for the Sparkplug platform. Built with 
 ## Features
 
 - User authentication with JWT tokens
+  - Issues and signs tokens with private key
+  - Provides JWK endpoint (public key) to other services for validation 
 - User registration with email or phone number
 - Role-based authorization
 - Swagger/OpenAPI documentation

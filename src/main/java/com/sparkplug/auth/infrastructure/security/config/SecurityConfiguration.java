@@ -1,10 +1,8 @@
 package com.sparkplug.auth.infrastructure.security.config;
 
 import com.sparkplug.auth.infrastructure.security.custom.Http403CustomEntryPoint;
-import com.sparkplug.auth.infrastructure.security.filter.ExceptionHandlerFilter;
-import com.sparkplug.commonauthentication.contract.PublicKeyProvider;
+import com.sparkplug.commonauthentication.filter.ExceptionHandlerFilter;
 import com.sparkplug.commonauthentication.filter.JwtFilter;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -33,22 +31,8 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfiguration {
 
-    private final ExceptionHandlerFilter exceptionHandlerFilter;
-    private final UserDetailsService userDetailsService;
-    private final PasswordEncoder passwordEncoder;
-
-    @Autowired
-    public SecurityConfiguration(
-            ExceptionHandlerFilter exceptionHandlerFilter,
-            UserDetailsService userDetailsService,
-            PasswordEncoder passwordEncoder) {
-        this.exceptionHandlerFilter = exceptionHandlerFilter;
-        this.userDetailsService = userDetailsService;
-        this.passwordEncoder = passwordEncoder;
-    }
-
     @Bean
-    public AuthenticationProvider authenticationProvider() {
+    public AuthenticationProvider authenticationProvider(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
@@ -61,42 +45,23 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity, JwtFilter jwtFilter) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity httpSecurity, JwtFilter jwtFilter, ExceptionHandlerFilter exceptionHandlerFilter) throws Exception {
         httpSecurity
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorizeRequest -> authorizeRequest
                         .requestMatchers(
                                 "/swagger-ui/**", "/v3/api-docs/**",
-                                "/auth/login", "/auth/register/**",
+                                "/login", "/register/**",
                                 "/.well-known/jwks.json").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(e -> e.authenticationEntryPoint(authenticationEntryPoint()))
                 .addFilterBefore(exceptionHandlerFilter, LogoutFilter.class)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .cors(c -> c.configurationSource(corsConfigurationSource()));
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return httpSecurity.build();
-    }
-
-    @Bean
-    JwtFilter jwtFilter(PublicKeyProvider publicKeyProvider) {
-        return new JwtFilter(publicKeyProvider);
-    }
-
-    @Bean
-    UrlBasedCorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-
-        return source;
     }
 
     @Bean
